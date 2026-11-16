@@ -54,6 +54,42 @@ router.get('/', async(req,res)=>{
     })))
 })
 
+//feladat megoldása Ai segítségével készült
+router.get('/kereses', async(req,res)=>{
+    const {van} = req.query
+
+    const hozzavalok = [...new Set(
+    van.split(',').map(h => h.trim()).filter(h => h !== '')
+    )]
+
+    if (hozzavalok.length === 0) {
+    return res.status(400).json({
+        error: "Adjon meg hozzávalót"
+        })
+    }
+
+    const helyek = hozzavalok.map(() => '?').join(',')
+
+    let sql = `
+    SELECT c.id, c.nev, c.kategoria
+    FROM  receptek c  
+    JOIN recept_hozzavalok rh ON rh.recept_id = c.id
+    JOIN hozzavalok h ON h.id = rh.hozzavalo_id
+    WHERE h.nev IN (${helyek})
+    GROUP BY c.id, c.nev, c.kategoria
+    HAVING COUNT(DISTINCT h.id) = ?
+    ORDER BY c.nev ASC
+`
+    const [eredmeny] = await pool.query(sql,[
+        ...hozzavalok,
+        hozzavalok.length
+    ])
+
+    res.status(200).json(eredmeny)
+
+})
+
+
 router.get('/:id', async(req,res)=>{
     const { id } = req.params
     const { adag } = req.query
@@ -124,6 +160,5 @@ router.get('/:id', async(req,res)=>{
     res.status(200).json(receptek)
 
 })
-
 
 export default router
