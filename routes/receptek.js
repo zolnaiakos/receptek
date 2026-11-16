@@ -38,7 +38,7 @@ router.get('/', async(req,res)=>{
         })
     }
 
-    
+
     if (!Number.isInteger(Number(maxIdo)) || Number(maxIdo) <= 0) {
     return res.status(400).json({
         error: "Hibás maxIdő érték"
@@ -52,6 +52,51 @@ router.get('/', async(req,res)=>{
         hozzavaloDb: Number(recept.hozzavaloDb),
         koltseg: Number(recept.koltseg ?? 0)
     })))
+})
+
+router.get('/:id', async(req,res)=>{
+    const { id } = req.params
+
+    const { adag } = req.query
+
+    let sql = `
+    SELECT c.id, c.nev, c.kategoria, c.adag, c.ido, h.id AS hozzavaloId, h.nev AS hozzavaloNev, rh.mennyiseg, h.mertekegyseg, (rh.mennyiseg * h.egysegar) AS koltseg
+    FROM receptek c    
+    LEFT JOIN recept_hozzavalok rh ON rh.recept_id = c.id
+    LEFT JOIN hozzavalok h ON h.id = rh.hozzavalo_id
+    WHERE c.id = ?
+    ORDER BY h.nev ASC
+`
+    
+    const [eredmeny] = await pool.query(sql, [id])
+
+    const receptek = {
+        id: eredmeny[0].id,
+        nev: eredmeny[0].nev,
+        kategoria: eredmeny[0].kategoria,
+        adag: eredmeny[0].adag,
+        ido: eredmeny[0].ido,
+        hozzavalok:[]
+    }
+
+    eredmeny.forEach(hozzavalok=>{
+        receptek.hozzavalok.push({
+            id: hozzavalok.hozzavaloId,
+            nev: hozzavalok.hozzavaloNev,
+            mennyiseg: Number(hozzavalok.mennyiseg),
+            mertekegyseg: hozzavalok.mertekegyseg,
+            koltseg: Number(hozzavalok.koltseg)
+        })
+    })
+
+    receptek.koltseg = receptek.hozzavalok.reduce(
+    (osszeg, h) => osszeg + h.koltseg, 0
+    )
+
+    receptek.adagonkent = Math.round(receptek.koltseg / receptek.adag)
+
+    res.status(200).json(receptek)
+
 })
 
 
