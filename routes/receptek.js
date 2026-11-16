@@ -7,7 +7,8 @@ const router = Router();
 router.get('/', async(req,res)=>{
 
     const {kategoria, maxIdo} = req.query
- 
+    const kategoriak = ['főétel', 'leves', 'desszert', 'reggeli']
+
     let params = []
 
     let sql = `
@@ -30,6 +31,19 @@ router.get('/', async(req,res)=>{
 
     sql += ' GROUP BY c.id, c.nev, c.kategoria, c.adag, c.ido'
     sql += ' ORDER BY c.nev ASC'
+
+     if (kategoria && !kategoriak.includes(kategoria)) {
+    return res.status(400).json({
+        error: "Hibás kategória"
+        })
+    }
+
+    
+    if (!Number.isInteger(Number(maxIdo)) || Number(maxIdo) <= 0) {
+    return res.status(400).json({
+        error: "Hibás maxIdő érték"
+        })
+    }
 
     const [eredmeny] = await pool.query(sql,params)
 
