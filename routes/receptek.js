@@ -56,8 +56,9 @@ router.get('/', async(req,res)=>{
 
 router.get('/:id', async(req,res)=>{
     const { id } = req.params
-
     const { adag } = req.query
+
+
 
     let sql = `
     SELECT c.id, c.nev, c.kategoria, c.adag, c.ido, h.id AS hozzavaloId, h.nev AS hozzavaloNev, rh.mennyiseg, h.mertekegyseg, (rh.mennyiseg * h.egysegar) AS koltseg
@@ -70,6 +71,18 @@ router.get('/:id', async(req,res)=>{
     
     const [eredmeny] = await pool.query(sql, [id])
 
+    if (eredmeny.length === 0) {
+    return res.status(404).json({
+        error: "A recept nem található"
+        })
+    }
+
+    if (adag !== undefined && (!Number.isInteger(Number(adag)) || Number(adag) <= 0)) {
+    return res.status(400).json({
+        error: "Hibás adag"
+        })
+    }
+
     const receptek = {
         id: eredmeny[0].id,
         nev: eredmeny[0].nev,
@@ -79,21 +92,34 @@ router.get('/:id', async(req,res)=>{
         hozzavalok:[]
     }
 
+    let szorzo = 1  
+
+    if (adag) {
+    szorzo = Number(adag) / receptek.adag
+    }
+
     eredmeny.forEach(hozzavalok=>{
         receptek.hozzavalok.push({
             id: hozzavalok.hozzavaloId,
             nev: hozzavalok.hozzavaloNev,
-            mennyiseg: Number(hozzavalok.mennyiseg),
+            mennyiseg: Number(hozzavalok.mennyiseg) * szorzo,
             mertekegyseg: hozzavalok.mertekegyseg,
-            koltseg: Number(hozzavalok.koltseg)
+            koltseg: Number(hozzavalok.koltseg) * szorzo
         })
     })
 
+
     receptek.koltseg = receptek.hozzavalok.reduce(
-    (osszeg, h) => osszeg + h.koltseg, 0
+        (osszeg, h) => osszeg + h.koltseg, 0
     )
 
-    receptek.adagonkent = Math.round(receptek.koltseg / receptek.adag)
+    if (adag) {
+    receptek.adag = Number(adag)
+    }
+
+    receptek.adagonkent = Math.round(
+    receptek.koltseg / receptek.adag
+    )
 
     res.status(200).json(receptek)
 
